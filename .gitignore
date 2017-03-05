@@ -1,0 +1,4 @@
+old/
+virtualenv/
+dman.cfg
+dman.json
