@@ -166,21 +166,25 @@ def main():
         group.add_argument("-u", "--user",
                             dest="user",
                             nargs='?',
-                            type=str)
+                            type=str,
+                            help="Create new user. Requires -p (--pass)")
         group.add_argument("-p", "--pass",
                             dest="userpass",
                             nargs='?',
-                            type=str)
+                            type=str,
+                            help="password to be hashed and added to json DB")
 
         parser.add_argument("-d", "--del",
                             action="store_true",
                             default=False,
-                            dest="deluser")
+                            dest="deluser",
+                            help="delete specified user. Requires -u (--user)")
 
         parser.add_argument("-l", "--list",
                             action="store_true",
                             default=False,
-                            dest="listuser")
+                            dest="listuser",
+                            help="List users and hashes from current DB.")
 
         args, leftovers = parser.parse_known_args()
 
