@@ -99,27 +99,32 @@ def main():
                         dest="postvar",
                         nargs='?',
                         const=vuuid,
-                        type=str)
+                        type=str,
+                        help='Create new record')
 
     parser.add_argument("-g", "--get",
                         action="store_true", dest="getvar",
-                        default=False)
+                        default=False,
+                        help='get single record')
 
     parser.add_argument("-pu", "--put",
                         dest="putvar",
                         nargs='?',
                         const=vdeftimeout,
-                        type=int)
+                        type=int,
+                        help='Update existing record')
 
     parser.add_argument("-a", "--getall",
                         action="store_true", dest="getall",
-                        default=False)
+                        default=False,
+                        help='List all records')
 
     parser.add_argument("-d", "--delete",
                         dest="delete",
                         nargs='?',
                         const=vuuid,
-                        type=str)
+                        type=str,
+                        help='delete current or specified record')
 
     args, leftovers = parser.parse_known_args()
 
