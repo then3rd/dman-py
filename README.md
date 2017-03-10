@@ -1,6 +1,8 @@
 # dman - a python deadman switch
 TODO: Write a project description
+
 TODO: Impliment client-side timekeeping
+
 TODO: replace autodecrypt.sh with python in dman-client
 
 ## Installation/Configuration
@@ -49,8 +51,8 @@ Now post a new node
   OK: Read existing config.
   ---JSON---
   {
-      "count": "86400", 
-      "state": "alive", 
+      "count": "86400",
+      "state": "alive",
       "death": "1489274663"
   }
 ```
