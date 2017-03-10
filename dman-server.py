@@ -12,10 +12,11 @@ app = Flask(__name__)
 app.config['ERROR_404_HELP'] = False
 api = Api(app)
 auth = HTTPBasicAuth()
-parser = reqparse.RequestParser()
-parser.add_argument('state')
-parser.add_argument('uuid')
-parser.add_argument('delta', type=int)
+
+ApiParser = reqparse.RequestParser()
+ApiParser.add_argument('state')
+ApiParser.add_argument('uuid')
+ApiParser.add_argument('delta', type=int)
 
 nodedb = 'nodedb.json'
 userdb = 'userdb.json'
@@ -79,9 +80,9 @@ def checktimedelta(vtime):
 
 ##Checks epoch times and updates the json file
 def checknode(node_uuid):
-    args = parser.parse_args()
-    if args['delta']:
-        future_epoch = time_plus_delta(args['delta'])
+    apiargs = ApiParser.parse_args()
+    if apiargs['delta'] is not None:
+        future_epoch = time_plus_delta(apiargs['delta'])
     elif NODELIST[node_uuid]['death']:
         future_epoch = int(NODELIST[node_uuid]['death'])
     else:
@@ -96,12 +97,14 @@ def checknode(node_uuid):
 class DeadmanNode(Resource):
     @auth.login_required
     def get(self, node_uuid):
+        apiargs = ApiParser.parse_args()
         abort_if_node_doesnt_exist(node_uuid)
         checknode(node_uuid)
         return NODELIST[node_uuid]
 
     @auth.login_required
     def delete(self, node_uuid):
+        apiargs = ApiParser.parse_args()
         abort_if_node_doesnt_exist(node_uuid)
         del NODELIST[node_uuid]
         writejson(nodedb,NODELIST)
@@ -109,8 +112,8 @@ class DeadmanNode(Resource):
 
     @auth.login_required
     def put(self, node_uuid):
+        apiargs = ApiParser.parse_args()
         abort_if_node_doesnt_exist(node_uuid)
-        args = parser.parse_args()
         checknode(node_uuid)
         return NODELIST[node_uuid], 201
 
@@ -124,8 +127,8 @@ class DeadmanRoot(Resource):
 
     @auth.login_required
     def post(self):
-        args = parser.parse_args()
-        node_uuid = args['uuid']
+        apiargs = ApiParser.parse_args()
+        node_uuid = apiargs['uuid']
         checknode(node_uuid)
         return NODELIST[node_uuid], 201
 
@@ -161,50 +164,51 @@ def main():
         #print NODELIST
         #print USERLIST
 
-        parser = argparse.ArgumentParser(description="Deadman Server")
-        group = parser.add_argument_group('new user')
-        group.add_argument("-u", "--user",
+        CLIParser = argparse.ArgumentParser(description="Deadman Server")
+        CLIGroup = CLIParser.add_argument_group('new user')
+        CLIGroup.add_argument("-u", "--user",
                             dest="user",
                             nargs='?',
                             type=str,
                             help="Create new user. Requires -p (--pass)")
-        group.add_argument("-p", "--pass",
+
+        CLIGroup.add_argument("-p", "--pass",
                             dest="userpass",
                             nargs='?',
                             type=str,
                             help="password to be hashed and added to json DB")
 
-        parser.add_argument("-d", "--del",
+        CLIGroup.add_argument("-d", "--del",
                             action="store_true",
                             default=False,
                             dest="deluser",
                             help="delete specified user. Requires -u (--user)")
 
-        parser.add_argument("-l", "--list",
+        CLIGroup.add_argument("-l", "--list",
                             action="store_true",
                             default=False,
                             dest="listuser",
                             help="List users and hashes from current DB.")
 
-        args, leftovers = parser.parse_known_args()
+        cliargs, leftovers = CLIParser.parse_known_args()
 
-        if args.listuser:
+        if cliargs.listuser:
             for k,v in USERLIST.items():  # `items()` for python3 `iteritems()` for python2
                 print("%s : %s") % (k, USERLIST[k]['pass'])
         else:
-            if args.user:
-                if args.deluser:
+            if cliargs.user:
+                if cliargs.deluser:
                     try:
-                        del USERLIST[args.user]
+                        del USERLIST[cliargs.user]
                         writejson(userdb,USERLIST)
-                        print 'user %s deleted' % args.user
+                        print 'user %s deleted' % cliargs.user
                     except:
                         print("user does not exist")
                 else:
-                    if args.userpass:
-                        print('adding or updating "%s" in %s') % (args.user, userdb)
-                        appenduser = { 'pass' : generate_password_hash(args.userpass) }
-                        USERLIST[args.user] = appenduser
+                    if cliargs.userpass:
+                        print('adding or updating "%s" in %s') % (cliargs.user, userdb)
+                        appenduser = { 'pass' : generate_password_hash(cliargs.userpass) }
+                        USERLIST[cliargs.user] = appenduser
                         writejson(userdb,USERLIST)
                     else:
                         print "password required"

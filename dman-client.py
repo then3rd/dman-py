@@ -116,7 +116,7 @@ def main():
             Config_write()
             Config_read()
         except:
-            "cound not write Config!"
+            print("cound not write Config!")
 
     parser = argparse.ArgumentParser(description="dman client")
 
@@ -126,6 +126,13 @@ def main():
                         const=ConfigMain["uuid"],
                         type=str,
                         help="Create new record")
+
+    parser.add_argument("-t", "--time",
+                        dest="timevar",
+                        nargs="?",
+                        const=ConfigMain["deftimeout"],
+                        type=int,
+                        help="Specify time for post/put")
 
     parser.add_argument("-g", "--get",
                         action="store_true", dest="getvar",
@@ -160,13 +167,17 @@ def main():
         killthings()
         sys.exit(0)
         #TODO: report successful kill to server
+    if args.timevar is not None:
+        time = args.timevar
+    else:
+        time = ConfigMain["deftimeout"]
     if args.postvar:
-        r = requests.post(ConfigMain["dmanurl"], data = {"uuid":"%s" % args.postvar, "delta":"%d" % int(ConfigMain["deftimeout"])}, auth=(ConfigMain["user"], ConfigMain["pass"]))
+        r = requests.post(ConfigMain["dmanurl"], data = {"uuid":"%s" % args.postvar, "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
     if args.getvar:
         r = requests.get(ConfigMain["dmanurl"] + "/" + ConfigMain["uuid"], auth=(ConfigMain["user"], ConfigMain["pass"]))
         if r.status_code == 404: #bad response, node doesn"t exist yet
             print("Creating new node")
-            r = requests.post(ConfigMain["dmanurl"], data = {"uuid":"%s" % ConfigMain["uuid"], "delta":"%d" % int(ConfigMain["deftimeout"])}, auth=(ConfigMain["user"], ConfigMain["pass"]))
+            r = requests.post(ConfigMain["dmanurl"], data = {"uuid":"%s" % ConfigMain["uuid"], "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
         else: #good response, node exists
             try:
                 j = json.loads(r.text)
@@ -179,8 +190,8 @@ def main():
                     print("exception")
             except ValueError:
                 print("No JSON returned")
-    elif args.putvar:
-        r = requests.put(ConfigMain["dmanurl"] + "/" + ConfigMain["uuid"], data = { "delta":"%d" % args.putvar }, auth=(ConfigMain["user"], ConfigMain["pass"]))
+    elif args.putvar is not None:
+        r = requests.put(ConfigMain["dmanurl"] + "/" + ConfigMain["uuid"], data = { "delta":"%d" % int(time) }, auth=(ConfigMain["user"], ConfigMain["pass"]))
     elif args.getall:
         r = requests.get(ConfigMain["dmanurl"], auth=(ConfigMain["user"], ConfigMain["pass"]))
     elif args.delete:
