@@ -1,5 +1,6 @@
 old/
 virtualenv/
+venv/
 dman.cfg
 nodedb.json
 userdb.json

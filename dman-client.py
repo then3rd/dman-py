@@ -1,4 +1,4 @@
-#!virtualenv/bin/python
+#!venv/bin/python
 ##This code is incomplete. Use at own risk.
 #TODO: re-architect so there's client-side timekeeping if the server becomes unavailable
 
@@ -38,7 +38,7 @@ dman["deftimeout"] = "86400" #24 hours
 dman["luksopen"] = "/dev/system/encrypted_luks"
 
 #name of cryptsetup luksopen device to be created (/dev/mapper/decryptedname)
-dman["luksdecrypt"] = "/dev/mapper/decrypted_luks" 
+dman["luksdecrypt"] = "/dev/mapper/decrypted_luks"
 
 #Location to mount decrypted device
 dman["mountdir"] = "/mnt/decryptmount/"
@@ -47,7 +47,6 @@ def Config_write():
     Config.add_section("main")
     dman["uuid"] = uuid.uuid4()
     for x in dman:
-        print(x,dman[x])
         Config.set("main", x, dman[x])
     Config.add_section("dirs")
     Config.set("dirs", "dir1", "/foo/bar")
@@ -119,7 +118,7 @@ def killthings():
     try:
         subprocess.check_call([ "cryptsetup", "close", ConfigMain["luksdecrypt"] ])
     except:
-        print("ERROR: failed to stop LUKS device %s") % ConfigMain["luksdecrypt"] 
+        print("ERROR: failed to stop LUKS device %s") % ConfigMain["luksdecrypt"]
 
 def main():
     #Read Config, otherwise attempt to write a re-read a default one.
@@ -196,40 +195,40 @@ def main():
         time = args.timevar
     else:
         time = ConfigMain["deftimeout"]
-    if args.postvar:
-        r = requests.post(ConfigMain["url"], data = {"uuid":"%s" % args.postvar, "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
-    if args.getvar:
-        r = requests.get(ConfigMain["url"] + "/" + ConfigMain["uuid"], auth=(ConfigMain["user"], ConfigMain["pass"]))
-        if r.status_code == 404: #bad response, node doesn"t exist yet
-            print("Creating new node")
-            r = requests.post(ConfigMain["url"], data = {"uuid":"%s" % ConfigMain["uuid"], "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
-        else: #good response, node exists
-            try:
-                j = json.loads(r.text)
-                if j["state"] == "alive":
-                    print("ALIVE!!")
-                elif j["state"] == "dead":
-                    print("DEAD :(")
-                    killthings()
-                else:
-                    print("exception")
-            except ValueError:
-                print("No JSON returned")
-    elif args.putvar is not None:
-        r = requests.put(ConfigMain["url"] + "/" + ConfigMain["uuid"], data = { "delta":"%d" % int(time) }, auth=(ConfigMain["user"], ConfigMain["pass"]))
-    elif args.getall:
-        r = requests.get(ConfigMain["url"], auth=(ConfigMain["user"], ConfigMain["pass"]))
-    elif args.delete:
-        r = requests.delete(ConfigMain["url"] + "/" + args.delete, auth=(ConfigMain["user"], ConfigMain["pass"]))
-    else:
-        print("Options not specified")
-
     try:
-        r
-        print("---JSON---")
-        j = json.loads(r.text)
-        print(json.dumps(j, indent=4))
-    except:
-        print("No response or json not loaded")
+        if args.postvar:
+            r = requests.post(ConfigMain["url"], data = {"uuid":"%s" % args.postvar, "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
+        if args.getvar:
+            r = requests.get(ConfigMain["url"] + "/" + ConfigMain["uuid"], auth=(ConfigMain["user"], ConfigMain["pass"]))
+            if r.status_code == 404: #bad response, node doesn"t exist yet
+                print("STATUS: Creating new node")
+                r = requests.post(ConfigMain["url"], data = {"uuid":"%s" % ConfigMain["uuid"], "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
+            else: #good response, node exists
+                try:
+                    j = json.loads(r.text)
+                    if j["state"] == "alive":
+                        print("ALIVE!!")
+                    elif j["state"] == "dead":
+                        print("STATUS: node dead... killing")
+                        killthings()
+                    else:
+                        print("ERROR: unknown exception")
+                except ValueError:
+                    print("ERROR: No JSON returned")
+        elif args.putvar is not None:
+            r = requests.put(ConfigMain["url"] + "/" + ConfigMain["uuid"], data = { "delta":"%d" % int(time) }, auth=(ConfigMain["user"], ConfigMain["pass"]))
+        elif args.getall:
+            r = requests.get(ConfigMain["url"], auth=(ConfigMain["user"], ConfigMain["pass"]))
+        elif args.delete:
+            r = requests.delete(ConfigMain["url"] + "/" + args.delete, auth=(ConfigMain["user"], ConfigMain["pass"]))
+        try:
+            r
+            print("---JSON---")
+            j = json.loads(r.text)
+            print(json.dumps(j, indent=4))
+        except:
+            print("ERROR: No response or not JSON")
+    except Exception as err:
+        print("ERROR: request failure: {0}".format(err))
 
 main()
