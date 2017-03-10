@@ -24,12 +24,13 @@ Initialize server user database
   adding or updating "foo" in userdb.json
 ./dman-server.py -l
   foo : pbkdf2:sha256:50000$xu3ouzGc$21c1f778f881bf36c2873e7e7abee55c21c34806861aa7d7d1f284489a4c4df0
+```
 
 Initialize client config then edit as needed
 ```
 ./dman-client.py -a
 vim dman.cfg
-  ```
+```
 
 Now run the server
 ```
