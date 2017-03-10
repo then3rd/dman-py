@@ -1,5 +1,6 @@
 #!virtualenv/bin/python
 ##This code is incomplete. Use at own risk.
+#TODO: re-architect so there's client-side timekeeping if the server becomes unavailable
 
 import requests
 import json
@@ -19,7 +20,11 @@ Configfile = "./dman.cfg"
 
 global dman
 dman = {}
-#DMAN
+
+#DMAN defaults. To be written to Configfile if one doesn't exist.
+dman["user"] = "foo"
+dman["pass"] = "bar"
+
 #If you change this value, you MUST modify "PATH=/opt/dman:" in autodecrypt.sh
 dman["root"] = "/opt/dman/"
 
@@ -44,19 +49,28 @@ def Config_write():
     for x in dman:
         print(x,dman[x])
         Config.set("main", x, dman[x])
-    with open(Configfile, "wb") as file:
-        Config.write(file)
-    print("wrote default Config: %s") % Configfile
-    return True
+    Config.add_section("dirs")
+    Config.set("dirs", "dir1", "/foo/bar")
+    try:
+        with open(Configfile, "wb") as file:
+            Config.write(file)
+            print("OK: wrote default config: %s") % Configfile
+            return True
+    except:
+        print("ERROR: failed to write config %s") % Configfile 
+        raise
 
 def Config_read():
     Config.read(Configfile)
     global ConfigMain
-    global ConfigDir
-    ConfigMain = ConfigSectionMap("main")
-    ConfigDir = ConfigSectionMap("dirs")
-    print(Configfile + " loaded")
-    return True
+    global ConfigDirs
+    try:
+        ConfigMain = ConfigSectionMap("main")
+        ConfigDirs = ConfigSectionMap("dirs")
+        return True
+    except:
+        print("ERROR: Configfile incomplete")
+        raise
 
 def ConfigSectionMap(section):
     dict1 = {}
@@ -77,12 +91,12 @@ def killthings():
         for proc in psutil.process_iter():
             lsof = proc.open_files()
             for l in lsof:
-                for d in ConfigDir:
-                    if l[0].startswith(ConfigDir[d]):
-                        print(proc.pid,ConfigDir[d])
+                for d in ConfigDirs:
+                    if l[0].startswith(ConfigDirs[d]):
+                        print(proc.pid,ConfigDirs[d])
                         killpids.add(proc.pid)
-            for d in ConfigDir:
-                if proc.cwd().startswith(ConfigDir[d]):
+            for d in ConfigDirs:
+                if proc.cwd().startswith(ConfigDirs[d]):
                     print(proc.pid,proc.cwd())
                     killpids.add(proc.pid)
     except:
@@ -96,11 +110,11 @@ def killthings():
             print("ERROR: failed to kill %d") % p
     #Unmount Directories
     try:
-        for d in ConfigDir:
-            subprocess.check_call([ "umount", ConfigDir[d] ])
-            print("OK: unmounted %s") % ConfigDir[d]
+        for d in ConfigDirs:
+            subprocess.check_call([ "umount", ConfigDirs[d] ])
+            print("OK: unmounted %s") % ConfigDirs[d]
     except:
-        print("ERROR: failed to unmount %s") % ConfigDir[d]
+        print("ERROR: failed to unmount %s") % ConfigDirs[d]
     #Stop LUKS volume
     try:
         subprocess.check_call([ "cryptsetup", "close", ConfigMain["luksdecrypt"] ])
@@ -111,12 +125,23 @@ def main():
     #Read Config, otherwise attempt to write a re-read a default one.
     try:
         Config_read()
+        print("OK: Read existing config.")
     except:
+        print("ERROR: Could not read existing config. Creating new...")
         try:
             Config_write()
-            Config_read()
+            try:
+                Config_read()
+                print("OK: Read new config.")
+            except:
+                print("ERROR: Could not read new config. What??.")
         except:
-            print("cound not write Config!")
+            print("ERROR: Could not write new config.")
+
+    #try:
+    #    Config_read()
+    #except:
+    #    print("ERROR: Could not read new config.")
 
     parser = argparse.ArgumentParser(description="dman client")
 
@@ -172,12 +197,12 @@ def main():
     else:
         time = ConfigMain["deftimeout"]
     if args.postvar:
-        r = requests.post(ConfigMain["dmanurl"], data = {"uuid":"%s" % args.postvar, "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
+        r = requests.post(ConfigMain["url"], data = {"uuid":"%s" % args.postvar, "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
     if args.getvar:
-        r = requests.get(ConfigMain["dmanurl"] + "/" + ConfigMain["uuid"], auth=(ConfigMain["user"], ConfigMain["pass"]))
+        r = requests.get(ConfigMain["url"] + "/" + ConfigMain["uuid"], auth=(ConfigMain["user"], ConfigMain["pass"]))
         if r.status_code == 404: #bad response, node doesn"t exist yet
             print("Creating new node")
-            r = requests.post(ConfigMain["dmanurl"], data = {"uuid":"%s" % ConfigMain["uuid"], "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
+            r = requests.post(ConfigMain["url"], data = {"uuid":"%s" % ConfigMain["uuid"], "delta":"%d" % int(time)}, auth=(ConfigMain["user"], ConfigMain["pass"]))
         else: #good response, node exists
             try:
                 j = json.loads(r.text)
@@ -191,11 +216,11 @@ def main():
             except ValueError:
                 print("No JSON returned")
     elif args.putvar is not None:
-        r = requests.put(ConfigMain["dmanurl"] + "/" + ConfigMain["uuid"], data = { "delta":"%d" % int(time) }, auth=(ConfigMain["user"], ConfigMain["pass"]))
+        r = requests.put(ConfigMain["url"] + "/" + ConfigMain["uuid"], data = { "delta":"%d" % int(time) }, auth=(ConfigMain["user"], ConfigMain["pass"]))
     elif args.getall:
-        r = requests.get(ConfigMain["dmanurl"], auth=(ConfigMain["user"], ConfigMain["pass"]))
+        r = requests.get(ConfigMain["url"], auth=(ConfigMain["user"], ConfigMain["pass"]))
     elif args.delete:
-        r = requests.delete(ConfigMain["dmanurl"] + "/" + args.delete, auth=(ConfigMain["user"], ConfigMain["pass"]))
+        r = requests.delete(ConfigMain["url"] + "/" + args.delete, auth=(ConfigMain["user"], ConfigMain["pass"]))
     else:
         print("Options not specified")
 
