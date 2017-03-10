@@ -1,7 +1,7 @@
 # dman - a python deadman switch
 
 Ser
-This is a simple RESTful server/client pair that is used to close and dismount encrypted volumes on the client when a timer on the server reaches zero. Clients can "reset" the timer to prevent dismounting. AKA if you die and don't check in with the server before its counter reaches zero, the data on the client is made unavailable. The server supports multiple clients, databases are stired in a JSON file on the server and clients read configuration from an INI.
+This is a simple RESTful server/client pair that is used to close and dismount encrypted volumes on the client when a timer on the server reaches zero. Clients can "reset" the timer to prevent dismounting. AKA if you die and don't check in with the server before its counter reaches zero, the data on the client is made unavailable. The server supports multiple clients, databases are stored in a JSON file on the server and clients read configuration from an INI.
 
 
 ## Installation/Configuration
@@ -57,7 +57,7 @@ Now post a new node
   }
 ```
 
-Add the following line to root's crontab ( `sudo crontab -e`). When count == 0, proceses are killed, volume unmounted, and luks device will be closed
+Add the following line to root's crontab ( `sudo crontab -e`). When count == 0, processes are killed, volume unmounted, and luks device will be closed
 ```
 * * * * * /opt/dman/dman-client.py -g >>/opt/dman/dman_l.log 2>&1
 ```
