@@ -1,0 +1,1 @@
+{"test": {"pass": "pbkdf2:sha1:1000$B8cor6gD$1807af71938abb5f47f7aad53f5564760341e48c"}, "foo": {"pass": "pbkdf2:sha1:1000$Ll1pdaNj$7486a9ddeef488a578cba41b5c290373fdba33f1"}}

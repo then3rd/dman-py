@@ -134,15 +134,16 @@ class DeadmanRoot(Resource):
 
 @auth.verify_password
 def verify_password(username, password):
-    if USERLIST[username]:
-        return check_password_hash(USERLIST[username]['pass'], password)
-    return False
-
-@auth.get_password
-def get_password(username):
-    if username == 'foo':
-        return 'bar'
-    return None
+    try:
+        if USERLIST[username]:
+            pwcheck = check_password_hash(USERLIST[username]['pass'], password)
+            if pwcheck:
+                return pwcheck
+            else:
+                print("INFO: user [%s] password failure.") % username
+    except:
+        print("INFO: user [%s] not found in DB") % username
+        raise
 
 @auth.error_handler
 def unauthorized():
@@ -160,9 +161,6 @@ def main():
 
         NODELIST = readjson(nodedb)
         USERLIST = readjson(userdb)
-
-        #print NODELIST
-        #print USERLIST
 
         CLIParser = argparse.ArgumentParser(description="Deadman Server")
         CLIGroup = CLIParser.add_argument_group('new user')
@@ -208,6 +206,9 @@ def main():
                     if cliargs.userpass:
                         print('adding or updating "%s" in %s') % (cliargs.user, userdb)
                         appenduser = { 'pass' : generate_password_hash(cliargs.userpass) }
+                        print appenduser
+                        print cliargs.user
+                        USERLIST = {}
                         USERLIST[cliargs.user] = appenduser
                         writejson(userdb,USERLIST)
                     else:
