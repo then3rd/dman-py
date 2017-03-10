@@ -7,141 +7,172 @@ import uuid
 import ConfigParser
 import sys
 import argparse
+import psutil
+import os
+import subprocess
 
-defuser='foo'
-defpass='bar'
+defuser="foo"
+defpass="bar"
 
-config = ConfigParser.RawConfigParser()
-configfile = './dman.cfg'
+Config = ConfigParser.RawConfigParser()
+Configfile = "./dman.cfg"
 
+global dman
+dman = {}
 #DMAN
-#If you change this value, you MUST modify 'PATH=/opt/dman:' in autodecrypt.sh
-dmanroot = "/opt/dman/"
+#If you change this value, you MUST modify "PATH=/opt/dman:" in autodecrypt.sh
+dman["root"] = "/opt/dman/"
 
 #domain+scriptname to query
-dmanurl = 'http://localhost:5000/dman'
+dman["url"] = "http://localhost:5000/dman"
 
 #Default deadman set timeout.
-deftimeout = '86400' #24 hours
+dman["deftimeout"] = "86400" #24 hours
 
-##Name of encrypted LUKS device (i'm using LVM)
-luksopen = "/dev/system/encryptedvolume"
+##Name of encrypted LUKS device (i"m using LVM)
+dman["luksopen"] = "/dev/system/encrypted_luks"
 
 #name of cryptsetup luksopen device to be created (/dev/mapper/decryptedname)
-decryptdir = "decryptedname" 
+dman["luksdecrypt"] = "/dev/mapper/decrypted_luks" 
 
 #Location to mount decrypted device
-mountdir = "/mnt/decryptmount/"
+dman["mountdir"] = "/mnt/decryptmount/"
 
-vdeftimeout = 0
-
-def config_write():
-    config.add_section('main')
-    vuuid = uuid.uuid4()
-    config.set('main', 'uuid', '%s' % vuuid)
-    config.set('main', 'user', '%s' % defuser)
-    config.set('main', 'pass', '%s' % defpass)
-    config.set('main', 'dmanroot', '%s' % dmanroot)
-    config.set('main', 'dmanurl', '%s' % dmanurl)
-    config.set('main', 'deftimeout', '%s' % deftimeout)
-    config.set('main', 'luksopen', '%s' % luksopen)
-    config.set('main', 'decryptdir', '%s' % decryptdir)
-    config.set('main', 'mountdir', '%s' % mountdir)
-    with open(configfile, 'wb') as file:
-        config.write(file)
-    print "wrote default config: %s" % configfile
+def Config_write():
+    Config.add_section("main")
+    dman["uuid"] = uuid.uuid4()
+    for x in dman:
+        print(x,dman[x])
+        Config.set("main", x, dman[x])
+    with open(Configfile, "wb") as file:
+        Config.write(file)
+    print("wrote default Config: %s") % Configfile
     return True
 
-def config_read():
-    config.read(configfile)
-    global vuuid
-    global vuser
-    global vpass
-    global vdmanroot
-    global vdmanurl
-    global vdeftimeout
-    global vluksopen
-    global vdecryptdir
-    global vmountdir
-    vuuid = config.get('main', 'uuid')
-    vuser = config.get('main', 'user')
-    vpass = config.get('main', 'pass')
-    vdmanroot = config.get('main', 'dmanroot')
-    vdmanurl = config.get('main', 'dmanurl')
-    vdeftimeout = config.getint('main', 'deftimeout')
-    vluksopen = config.get('main', 'luksopen')
-    vdecryptdir = config.get('main', 'decryptdir')
-    vmountdir = config.get('main', 'mountdir')
-    print(configfile + ' loaded')
-    #print(vuuid)
+def Config_read():
+    Config.read(Configfile)
+    global ConfigMain
+    global ConfigDir
+    ConfigMain = ConfigSectionMap("main")
+    ConfigDir = ConfigSectionMap("dirs")
+    print(Configfile + " loaded")
     return True
+
+def ConfigSectionMap(section):
+    dict1 = {}
+    options = Config.options(section)
+    for option in options:
+        try:
+            dict1[option] = Config.get(section, option)
+            if dict1[option] == -1:
+                DebugPrint("skip: %s" % option)
+        except:
+            print("exception on %s!" % option)
+            dict1[option] = None
+    return dict1
 
 def killthings():
-    print('lsof "%s" 2>/dev/null|awk \'{if ($2 ~ /^[0-9]/) print $2}\'|xargs kill' % vmountdir)
-    print('umount "%s"' % vmountdir)
-    print('cryptsetup close "%s"' % vdecryptdir)
+    killpids = set()
+    try:
+        for proc in psutil.process_iter():
+            lsof = proc.open_files()
+            for l in lsof:
+                for d in ConfigDir:
+                    if l[0].startswith(ConfigDir[d]):
+                        print(proc.pid,ConfigDir[d])
+                        killpids.add(proc.pid)
+            for d in ConfigDir:
+                if proc.cwd().startswith(ConfigDir[d]):
+                    print(proc.pid,proc.cwd())
+                    killpids.add(proc.pid)
+    except:
+        print("error, could not read process list. Run as root?")
+    for p in killpids:
+        try:
+            if psutil.Process(p).is_running():
+                psutil.Process(p).kill()
+                print("killed: %d") % p
+        except:
+            print("ERROR: failed to kill %d") % p
+    #Unmount Directories
+    try:
+        for d in ConfigDir:
+            subprocess.check_call([ "umount", ConfigDir[d] ])
+            print("OK: unmounted %s") % ConfigDir[d]
+    except:
+        print("ERROR: failed to unmount %s") % ConfigDir[d]
+    #Stop LUKS volume
+    try:
+        subprocess.check_call([ "cryptsetup", "close", ConfigMain["luksdecrypt"] ])
+    except:
+        print("ERROR: failed to stop LUKS device %s") % ConfigMain["luksdecrypt"] 
 
 def main():
-    #Read config, otherwise attempt to write a re-read a default one.
-    global vdeftimeout
+    #Read Config, otherwise attempt to write a re-read a default one.
     try:
-        config_read()
+        Config_read()
     except:
         try:
-            config_write()
-            config_read()
+            Config_write()
+            Config_read()
         except:
-            "cound not write config!"
+            "cound not write Config!"
 
     parser = argparse.ArgumentParser(description="dman client")
 
     parser.add_argument("-po", "--post",
                         dest="postvar",
-                        nargs='?',
-                        const=vuuid,
+                        nargs="?",
+                        const=ConfigMain["uuid"],
                         type=str,
-                        help='Create new record')
+                        help="Create new record")
 
     parser.add_argument("-g", "--get",
                         action="store_true", dest="getvar",
                         default=False,
-                        help='get single record')
+                        help="get single record")
 
     parser.add_argument("-pu", "--put",
                         dest="putvar",
-                        nargs='?',
-                        const=vdeftimeout,
+                        nargs="?",
+                        const=ConfigMain["deftimeout"],
                         type=int,
-                        help='Update existing record')
+                        help="Update existing record")
 
     parser.add_argument("-a", "--getall",
                         action="store_true", dest="getall",
                         default=False,
-                        help='List all records')
+                        help="List all records")
 
     parser.add_argument("-d", "--delete",
                         dest="delete",
-                        nargs='?',
-                        const=vuuid,
+                        nargs="?",
+                        const=ConfigMain["uuid"],
                         type=str,
-                        help='delete current or specified record')
+                        help="delete current or specified record")
+
+    parser.add_argument("-k", "--kill",
+                        action="store_true", dest="kill",
+                        default=False)
 
     args, leftovers = parser.parse_known_args()
-
+    if args.kill:
+        killthings()
+        sys.exit(0)
+        #TODO: report successful kill to server
     if args.postvar:
-        response = requests.post(vdmanurl, data = {'uuid':'%s' % args.postvar, 'delta':'%d' % vdeftimeout}, auth=(vuser, vpass))
+        r = requests.post(ConfigMain["dmanurl"], data = {"uuid":"%s" % args.postvar, "delta":"%d" % int(ConfigMain["deftimeout"])}, auth=(ConfigMain["user"], ConfigMain["pass"]))
     if args.getvar:
-        response = requests.get(vdmanurl + "/" + vuuid, auth=(vuser, vpass))
-        #print response.status_code
-        if response.status_code == 404: #bad response, node doesn't exist yet
-            print "Creating new node"
-            response = requests.post(vdmanurl, data = {'uuid':'%s' % vuuid, 'delta':'%d' % vdeftimeout}, auth=(vuser, vpass))
+        r = requests.get(ConfigMain["dmanurl"] + "/" + ConfigMain["uuid"], auth=(ConfigMain["user"], ConfigMain["pass"]))
+        if r.status_code == 404: #bad response, node doesn"t exist yet
+            print("Creating new node")
+            r = requests.post(ConfigMain["dmanurl"], data = {"uuid":"%s" % ConfigMain["uuid"], "delta":"%d" % int(ConfigMain["deftimeout"])}, auth=(ConfigMain["user"], ConfigMain["pass"]))
         else: #good response, node exists
             try:
-                json_object = json.loads(response.text)
-                if json_object["state"] == "alive":
+                j = json.loads(r.text)
+                if j["state"] == "alive":
                     print("ALIVE!!")
-                elif json_object["state"] == "dead":
+                elif j["state"] == "dead":
                     print("DEAD :(")
                     killthings()
                 else:
@@ -149,20 +180,20 @@ def main():
             except ValueError:
                 print("No JSON returned")
     elif args.putvar:
-        response = requests.put(vdmanurl + "/" + vuuid, data = { 'delta':'%d' % args.putvar }, auth=(vuser, vpass))
+        r = requests.put(ConfigMain["dmanurl"] + "/" + ConfigMain["uuid"], data = { "delta":"%d" % args.putvar }, auth=(ConfigMain["user"], ConfigMain["pass"]))
     elif args.getall:
-        response = requests.get(vdmanurl, auth=(vuser, vpass))
+        r = requests.get(ConfigMain["dmanurl"], auth=(ConfigMain["user"], ConfigMain["pass"]))
     elif args.delete:
-        response = requests.delete(vdmanurl + "/" + args.delete, auth=(vuser, vpass))
+        r = requests.delete(ConfigMain["dmanurl"] + "/" + args.delete, auth=(ConfigMain["user"], ConfigMain["pass"]))
     else:
         print("Options not specified")
 
     try:
-        response
+        r
         print("---JSON---")
-        json_object = json.loads(response.text)
-        print json.dumps(json_object, indent=4)
+        j = json.loads(r.text)
+        print(json.dumps(j, indent=4))
     except:
-        print("No response or json_object loaded")
+        print("No response or json not loaded")
 
 main()

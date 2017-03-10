@@ -3,12 +3,23 @@ TODO: Write a project description
 
 
 ## Server Installation/Config
-TODO
 
+Install requirements:
+```
+virtualenv virtualenv
+virtualenv/bin/pip install -r requirements.txt
+```
 ## Server Usage
 TODO
 
 ## Client Installation/Config
+First install python-devel (or python-dev) for your distribution. It's required for building the psutil module
+
+Next, install requirements:
+```
+virtualenv virtualenv
+virtualenv/bin/pip install -r requirements.txt
+```
 
 First. You will need to get the serial ( `ATTRS{serial}==` ) attribute from your falsh drive. Multiple devices can be added as separate rules.
 ```
