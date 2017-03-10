@@ -1,9 +1,4 @@
 # dman - a python deadman switch
-TODO: Write a project description
-
-TODO: Impliment client-side timekeeping
-
-TODO: replace autodecrypt.sh with python in dman-client
 
 ## Installation/Configuration
 
@@ -95,7 +90,10 @@ systemctl restart systemd-udevd.service
 
 Modify `autodecrypt.sh` to suit your environment. You should now have automatic luksOpen/mount functionality when plugging in the USB device containing the key.
 
+##TODO
 
-## History
-## License
+TODO: Write a project description
 
+TODO: Impliment client-side timekeeping
+
+TODO: replace autodecrypt.sh with python in dman-client
